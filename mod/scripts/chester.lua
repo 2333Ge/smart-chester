@@ -126,7 +126,7 @@ end
 
 -- 修改切斯特行为
 local function MakeSmartChester(inst)
-    print("初始化智能切斯特4")
+    print("初始化智能切斯特")
     -- if not GLOBAL.TheWorld.ismastersim then
     --     print("智能切斯特只能在服务器端运行")
     --     return inst
