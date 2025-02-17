@@ -43,7 +43,7 @@ local function GetMonsterInfo(monsters)
 end
 
 -- 调用 DeepSeek 模型
-local function SendToDeepSeek(messages)
+local function SendToDeepSeek(messages, callback)
     local url = "http://localhost:3000/api/chat" -- 本地 DeepSeek API 地址
     local headers = {["Content-Type"] = "application/json"}
     local body = json.encode({messages = messages})
@@ -56,17 +56,19 @@ local function SendToDeepSeek(messages)
     TheSim:QueryServer(url, function(response, isSuccessful, resultCode)
         if not isSuccessful then
             print("错误: 未收到 DeepSeek API 的响应")
-            return "无法获取响应"
+            callback("无法获取响应")
+            return
         end
 
         local data = json.decode(response)
         if not data or not data.response then
             print("错误: DeepSeek API 返回无效响应")
-            return "无效的响应"
+            callback("无效的响应")
+            return
         end
 
         print("收到 DeepSeek API 的响应: " .. response)
-        return data.response -- 假设 API 返回的响应字段是 response
+        callback(data.response) -- 假设 API 返回的响应字段是 response
     end, "POST", body, 60, headers) -- 修改第四个参数为数字（例如 60 秒超时）
 end
 
@@ -93,8 +95,9 @@ local function GenerateChesterDialogue(inst)
     }
 
     print("生成切斯特对话，环境信息: " .. messages[1].content)
-    local response = SendToDeepSeek(messages)
-    ChesterSpeak(inst, response)
+    SendToDeepSeek(messages, function(response)
+        ChesterSpeak(inst, response)
+    end)
 end
 
 -- 检测附近怪物并生成对话
@@ -113,8 +116,9 @@ local function CheckForDangers(inst)
         }
 
         print("生成切斯特对话，怪物信息: " .. messages[1].content)
-        local response = SendToDeepSeek(messages)
-        ChesterSpeak(inst, response)
+        SendToDeepSeek(messages, function(response)
+            ChesterSpeak(inst, response)
+        end)
     else
         print("附近没有发现怪物")
     end
@@ -143,15 +147,15 @@ local function MakeSmartChester(inst)
     end
     inst:DoTaskInTime(10, OnTimer) -- 10 秒后开始发言
 
-    -- 监听玩家接近事件
-    inst:ListenForEvent("onnear", function(inst, player)
-        if player and player.components.talker then
-            print("玩家接近，生成对话")
-            GenerateChesterDialogue(inst)
-        else
-            print("玩家接近但没有对话组件")
-        end
-    end)
+    -- -- 监听玩家接近事件
+    -- inst:ListenForEvent("onnear", function(inst, player)
+    --     if player and player.components.talker then
+    --         print("玩家接近，生成对话")
+    --         GenerateChesterDialogue(inst)
+    --     else
+    --         print("玩家接近但没有对话组件")
+    --     end
+    -- end)
 
     -- 监听怪物接近事件
     inst:DoPeriodicTask(5, function() CheckForDangers(inst) end) -- 每隔 5 秒检测一次
