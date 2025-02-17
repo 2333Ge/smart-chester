@@ -1,0 +1,10 @@
+name = "Smart Chester"
+description = "Chester can perceive the environment and chat with you using AI!"
+author = "Your Name"
+version = "1.0"
+forumthread = ""
+api_version = 10
+dst_compatible = true
+all_clients_require_mod = true
+icon_atlas = "modicon.xml"
+icon = "modicon.tex"
