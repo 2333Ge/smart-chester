@@ -1,1 +1,1 @@
-require "scripts/chester"
+modimport("scripts/chester")

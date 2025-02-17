@@ -1,3 +1,6 @@
+-- 加载 json 库
+local json = require("json")
+
 -- 环境感知
 local function GetEnvironmentInfo()
     local env = {}
@@ -9,7 +12,7 @@ local function GetEnvironmentInfo()
     if GLOBAL.ThePlayer and GLOBAL.ThePlayer.components.temperature then
         env.temperature = GLOBAL.ThePlayer.components.temperature:GetCurrent()
     else
-        env.temperature = "unknown"
+        env.temperature = "未知"
     end
 
     -- 获取生物群系（通过坐标判断）
@@ -19,13 +22,14 @@ local function GetEnvironmentInfo()
 
     -- 获取天气
     if GLOBAL.TheWorld.state.israining then
-        env.weather = "raining"
+        env.weather = "下雨"
     elseif GLOBAL.TheWorld.state.issnowing then
-        env.weather = "snowing"
+        env.weather = "下雪"
     else
-        env.weather = "clear"
+        env.weather = "晴朗"
     end
 
+    print("环境信息: 季节=" .. env.season .. ", 温度=" .. env.temperature .. ", 生物群系=" .. env.biome .. ", 天气=" .. env.weather)
     return env
 end
 
@@ -39,30 +43,57 @@ local function GetMonsterInfo(monsters)
 end
 
 -- 调用 DeepSeek 模型
-local function SendToDeepSeek(prompt)
-    local url = "http://localhost:5000/api/chat" -- 本地 DeepSeek API 地址
+local function SendToDeepSeek(messages)
+    local url = "http://localhost:3000/api/chat" -- 本地 DeepSeek API 地址
     local headers = {["Content-Type"] = "application/json"}
-    local body = json.encode({prompt = prompt, max_tokens = 50})
+    local body = json.encode({messages = messages})
+
+    -- 添加调试信息
+    print("发送请求到 DeepSeek API...")
+    print("请求内容: " .. body)
 
     -- 发送 HTTP 请求
-    local response = GLOBAL.TheSim:HttpGet(url, body, headers)
-    local data = json.decode(response)
-    return data.response -- 假设 API 返回的响应字段是 response
+    TheSim:QueryServer(url, function(response, isSuccessful, resultCode)
+        if not isSuccessful then
+            print("错误: 未收到 DeepSeek API 的响应")
+            return "无法获取响应"
+        end
+
+        local data = json.decode(response)
+        if not data or not data.response then
+            print("错误: DeepSeek API 返回无效响应")
+            return "无效的响应"
+        end
+
+        print("收到 DeepSeek API 的响应: " .. response)
+        return data.response -- 假设 API 返回的响应字段是 response
+    end, "POST", body, 60, headers) -- 修改第四个参数为数字（例如 60 秒超时）
 end
 
 -- 切斯特发言
 local function ChesterSpeak(inst, message)
-    if inst.components.talker then inst.components.talker:Say(message) end
+    if inst.components.talker then
+        print("切斯特说: " .. message)
+        inst.components.talker:Say(message)
+    else
+        print("错误: 切斯特没有对话组件")
+    end
 end
 
 -- 检查环境信息并生成对话
 local function GenerateChesterDialogue(inst)
     local env = GetEnvironmentInfo()
-    local prompt = string.format(
-                       "Current environment: Season=%s, Temperature=%s, Biome=%s, Weather=%s. What should Chester say?",
-                       env.season, env.temperature, env.biome, env.weather)
+    local messages = {
+        {
+            role = "system",
+            content = string.format(
+                "当前环境: 季节=%s, 温度=%s, 生物群系=%s, 天气=%s。切斯特应该说什么？",
+                env.season, env.temperature, env.biome, env.weather)
+        }
+    }
 
-    local response = SendToDeepSeek(prompt)
+    print("生成切斯特对话，环境信息: " .. messages[1].content)
+    local response = SendToDeepSeek(messages)
     ChesterSpeak(inst, response)
 end
 
@@ -72,17 +103,30 @@ local function CheckForDangers(inst)
     local monsters = GLOBAL.TheSim:FindEntities(x, y, z, 10, {"monster"})
     if #monsters > 0 then
         local monster_info = GetMonsterInfo(monsters)
-        local prompt = string.format(
-                           "Monsters detected nearby: %s. What should Chester say?",
-                           monster_info)
-        local response = SendToDeepSeek(prompt)
+        local messages = {
+            {
+                role = "system",
+                content = string.format(
+                    "附近发现怪物: %s。切斯特应该说什么？",
+                    monster_info)
+            }
+        }
+
+        print("生成切斯特对话，怪物信息: " .. messages[1].content)
+        local response = SendToDeepSeek(messages)
         ChesterSpeak(inst, response)
+    else
+        print("附近没有发现怪物")
     end
 end
 
 -- 修改切斯特行为
 local function MakeSmartChester(inst)
-    if not GLOBAL.TheWorld.ismastersim then return inst end
+    print("初始化智能切斯特4")
+    -- if not GLOBAL.TheWorld.ismastersim then
+    --     print("智能切斯特只能在服务器端运行")
+    --     return inst
+    -- end
 
     -- 添加对话组件
     inst:AddComponent("talker")
@@ -93,6 +137,7 @@ local function MakeSmartChester(inst)
 
     -- 定时器：每隔一段时间随机发言
     local function OnTimer()
+        print("定时器触发")
         GenerateChesterDialogue(inst)
         inst:DoTaskInTime(math.random(30, 60), OnTimer) -- 每隔 30-60 秒发言一次
     end
@@ -101,24 +146,15 @@ local function MakeSmartChester(inst)
     -- 监听玩家接近事件
     inst:ListenForEvent("onnear", function(inst, player)
         if player and player.components.talker then
+            print("玩家接近，生成对话")
             GenerateChesterDialogue(inst)
+        else
+            print("玩家接近但没有对话组件")
         end
     end)
 
     -- 监听怪物接近事件
     inst:DoPeriodicTask(5, function() CheckForDangers(inst) end) -- 每隔 5 秒检测一次
-
-    -- 玩家互动
-    -- inst:AddComponent("inspectable")
-    -- inst.components.inspectable:SetDescription(function()
-    --     return "A smart Chester who loves to chat!"
-    -- end)
-
-    -- inst:ListenForEvent("onactivate", function(inst, doer)
-    --     if doer and doer.components.talker then
-    --         GenerateChesterDialogue(inst)
-    --     end
-    -- end)
 
     return inst
 end

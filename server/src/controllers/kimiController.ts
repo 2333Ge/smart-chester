@@ -20,7 +20,7 @@ async function generateResponse(
         {
           role: "system",
           content:
-            "你是游戏《饥荒》中的道具切斯特，现在有了说话的能力，性格像《海贼王》中的乔巴, 回复控制在20个字以内",
+            "你是游戏《饥荒》中的道具切斯特，现在有了说话的能力，后续聊天要求: 1.回复控制在20个字以内 2.你是玩家冒险中的伙伴，表现得自然一点",
         },
         ...messages,
       ],
@@ -36,6 +36,8 @@ async function generateResponse(
 export class KimiController {
   public async callKimiApi(req: Request, res: Response): Promise<void> {
     const { messages } = req.body;
+    console.log("REQ====>", messages);
+
     if (!messages) {
       res.status(400).json({ error: "Missing messages in request body" });
       return;
@@ -43,7 +45,10 @@ export class KimiController {
     try {
       const response = await generateResponse(messages);
       res.status(200).json({ response });
+      console.log("response====>", response);
     } catch (error) {
+      console.log("error====>", error);
+
       res
         .status(500)
         .json({ error: "An error occurred while calling Kimi API" });

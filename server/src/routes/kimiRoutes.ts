@@ -5,6 +5,6 @@ const router = Router();
 const kimiController = new KimiController();
 
 export function setKimiRoutes(app: Router) {
-  app.use("/kimi", router);
-  router.post("/call", kimiController.callKimiApi);
+  app.use("/api", router);
+  router.post("/chat", kimiController.callKimiApi);
 }

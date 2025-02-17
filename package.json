@@ -1,0 +1,10 @@
+{
+  "name": "smart-chester",
+  "version": "1.0.0",
+  "scripts": {
+    "copy-mod": "copyfiles -u 1 -a \"mod/**/*\" \"D:/software/steam/steamapps/common/Don't Starve Together/mods/smart-chester\""
+  },
+  "devDependencies": {
+    "copyfiles": "^2.4.1"
+  }
+}
